@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 
 
-const Login = ({ auth }) => {
+const Login = ({ auth, backendUrl }) => {
     const navigate = useNavigate();
-    const { user, setUser } = auth
+    const { user, setUser, Url } = auth
+    // console.log(Url.backendUrl)
     const [mode, setMode] = useState('login')
     const [formData, setFormData] = useState({ username: '', password: '', confirmPassword: '' })
     const [error, setError] = useState('')
@@ -23,7 +24,7 @@ const Login = ({ auth }) => {
         }
 
         try {
-            const endpoint = mode === 'login' ? `http://localhost:8000/auth/login/` : `http://localhost:8000/auth/signup/`
+            const endpoint = mode === 'login' ? `${Url.backendUrl}/auth/login/` : `${Url.backendUrl}/auth/signup/`
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
@@ -44,7 +45,7 @@ const Login = ({ auth }) => {
             localStorage.setItem('accessToken', data.access)
             document.cookie = `refreshToken=${data.refresh}; path=/; max-age=86400; SameSite=Lax`
 
-            const meResponse = await fetch(`http://localhost:8000/auth/me`, {
+            const meResponse = await fetch(`${Url.backendUrl}/auth/me`, {
                 headers: {
                     Authorization: `Bearer ${data.access}`
                 }

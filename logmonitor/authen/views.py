@@ -1,13 +1,16 @@
 from django.shortcuts import render
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from django.contrib.auth.models import User
+from rest_framework.permissions import AllowAny
 
 # Create your views here.
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def me(request):
+
     access_token = request.headers.get('Authorization', '').split(' ')[1] if 'Authorization' in request.headers else None
     if not access_token:
         return Response({"error": "Access token is required."}, status=401)
