@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import ProjectCard from "../components/ProjectCard";
 
 const Home = ({ Url, user, getMe }) => {
+    const navigate = useNavigate();
     const uname = user ? user.username : "Developer";
     // console.log(Url)
     const getProjects = async () => {
@@ -65,15 +67,53 @@ const Home = ({ Url, user, getMe }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formError, setFormError] = useState("");
 
+    const [confirmModal, setConfirmModal] = useState({
+        isOpen: false,
+        type: "", // "deleteProject" or "signOut"
+        title: "",
+        message: "",
+        confirmText: "",
+        confirmStyle: "primary", // "danger" or "primary"
+        data: null,
+    });
+
     // Sync projects to localStorage
 
     const handleLogout = () => {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("user");
-        // Force redirect/reload so Router takes back to login
+        navigate("/login");
     };
 
-    const handleCreateProject = (e) => {
+    const handleSignOutClick = () => {
+        setConfirmModal({
+            isOpen: true,
+            type: "signOut",
+            title: "Sign Out",
+            message: "Are you sure you want to sign out of your account?",
+            confirmText: "Sign Out",
+            confirmStyle: "primary",
+            data: null,
+        });
+    };
+
+    const createProject = async () => {
+        const response = await fetch(`${Url}/logs/createproject/`, {
+            'method': 'POST',
+            'headers': {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+            },
+            'body': JSON.stringify({
+                'name': newProjectName,
+            })
+        })
+        const project = await response.json()
+        console.log(project)
+        return project
+    }
+
+    const handleCreateProject = async (e) => {
         e.preventDefault();
         setFormError("");
 
@@ -90,39 +130,59 @@ const Home = ({ Url, user, getMe }) => {
         setIsSubmitting(true);
 
         // Simulate API network call delay for satisfying UX
-        setTimeout(() => {
-            // Generate mock random hex for key
-            const randHex = Array.from({ length: 16 }, () =>
-                Math.floor(Math.random() * 16).toString(16)
-            ).join("");
+        const newProj = await createProject();
 
-            const newProj = {
-                id: Date.now().toString(),
-                name: newProjectName.trim(),
-                createdAt: new Date().toISOString(),
-                apiKey: `df_live_${randHex}`,
-                status: newProjectStatus,
-                logsCount: 0,
-                errorsCount: 0,
-                latency: "--"
-            };
-
-            setProjects(prev => [newProj, ...prev]);
-            setIsSubmitting(false);
-            setIsModalOpen(false);
-            setNewProjectName("");
-            setNewProjectStatus("healthy");
-        }, 1000);
+        setProjects(newProj);
+        setIsSubmitting(false);
+        setIsModalOpen(false);
+        setNewProjectName("");
+        setNewProjectStatus("healthy");
     };
 
     const handleDeleteProject = (id) => {
-        if (confirm("Are you sure you want to delete this project?")) {
-            setProjects(prev => prev.filter(p => p.id !== id));
+        const project = projects.find(p => p.id === id);
+        if (!project) return;
+        setConfirmModal({
+            isOpen: true,
+            type: "deleteProject",
+            title: "Delete Project",
+            message: `Are you sure you want to delete "${project.name}"? This will permanently delete the project and all of its associated logs. This action cannot be undone.`,
+            confirmText: "Delete Project",
+            confirmStyle: "danger",
+            data: id,
+        });
+    };
+
+    const handleConfirmAction = async () => {
+        if (confirmModal.type === "deleteProject") {
+            const id = confirmModal.data;
+            setIsSubmitting(true);
+            try {
+                const response = await fetch(`${Url}/logs/deleteproject/${id}/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    }
+                });
+                if (response.ok) {
+                    setProjects(prev => prev.filter(p => p.id !== id));
+                } else {
+                    console.error("Failed to delete project on backend");
+                }
+            } catch (err) {
+                console.error("Error deleting project:", err);
+            } finally {
+                setIsSubmitting(false);
+                setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            }
+        } else if (confirmModal.type === "signOut") {
+            handleLogout();
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
     };
 
     // Filter projects by search term
-    const filteredProjects = projects ? (projects.filter(p =>
+    const filteredProjects = projects.length > 0 ? (projects.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
     )) : []
 
@@ -164,7 +224,7 @@ const Home = ({ Url, user, getMe }) => {
                             </div>
 
                             <button
-                                onClick={handleLogout}
+                                onClick={handleSignOutClick}
                                 className="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-all duration-200"
                             >
                                 Sign Out
@@ -401,6 +461,96 @@ const Home = ({ Url, user, getMe }) => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirmation Modal Dialog */}
+            {confirmModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    {/* Backdrop */}
+                    <div
+                        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                        onClick={() => {
+                            if (!isSubmitting) setConfirmModal(prev => ({ ...prev, isOpen: false }));
+                        }}
+                    ></div>
+
+                    {/* Modal Container */}
+                    <div className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-150">
+                        {/* Close Button */}
+                        <button
+                            onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                            disabled={isSubmitting}
+                            className="absolute top-4 right-4 p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+
+                        <div className="flex items-start gap-4">
+                            {/* Icon */}
+                            <div className={`mt-0.5 h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                confirmModal.confirmStyle === "danger"
+                                    ? "bg-rose-500/10 text-rose-500"
+                                    : "bg-indigo-500/10 text-indigo-400"
+                            }`}>
+                                {confirmModal.confirmStyle === "danger" ? (
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                ) : (
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    </svg>
+                                )}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-white">
+                                    {confirmModal.title}
+                                </h3>
+                                <p className="mt-2 text-sm text-slate-400 leading-relaxed">
+                                    {confirmModal.message}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                            <button
+                                type="button"
+                                disabled={isSubmitting}
+                                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                                className="px-4 py-2 rounded-lg border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-semibold transition-all duration-150 disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmAction}
+                                disabled={isSubmitting}
+                                className={`inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-semibold shadow-md transition-all duration-150 disabled:opacity-80 ${
+                                    confirmModal.confirmStyle === "danger"
+                                        ? "bg-rose-600 hover:bg-rose-500 text-white"
+                                        : "bg-indigo-600 hover:bg-indigo-500 text-white"
+                                }`}
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    confirmModal.confirmText
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

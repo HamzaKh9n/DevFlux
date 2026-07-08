@@ -4,7 +4,7 @@ const ProjectCard = ({ project, onDelete }) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(project.apiKey || `df_live_${project.id}`);
+    navigator.clipboard.writeText(project.key);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -31,7 +31,7 @@ const ProjectCard = ({ project, onDelete }) => {
             {project.name}
           </h3>
           <p className="text-xs text-slate-500 mt-1">
-            Created on {new Date(project.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+            Created on {new Date(project.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
           </p>
         </div>
 
@@ -45,7 +45,7 @@ const ProjectCard = ({ project, onDelete }) => {
       {/* API Key / Token Section */}
       <div className="mt-5 rounded-lg bg-slate-950/80 p-3 border border-slate-800/80 flex items-center justify-between gap-3">
         <div className="overflow-hidden">
-          <span className="block text-[10px] text-slate-500 font-medium uppercase tracking-wider">Client Token</span>
+          <span className="block text-[10px] text-slate-500 font-medium uppercase tracking-wider">Api Key</span>
           <span className="font-mono text-xs text-slate-300 truncate block mt-0.5">
             {project.key || `df_live_${project.id}`}
           </span>
